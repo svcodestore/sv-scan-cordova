@@ -16,8 +16,12 @@
   },
   "cordova": {
     "plugins": {
-      "phonegap-plugin-barcodescanner": {},
-      "cordova-plugin-camera": {}
+      "phonegap-plugin-barcodescanner": {
+        "ANDROID_SUPPORT_V4_VERSION": "27.+"
+      },
+      "cordova-plugin-camera": {
+        "ANDROIDX_CORE_VERSION": "1.6.+"
+      }
     },
     "platforms": [
       "android"
