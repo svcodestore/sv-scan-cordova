@@ -3,7 +3,9 @@
   "displayName": "SV Prod Scan",
   "version": "0.0.1",
   "description": "A sample Apache Cordova application that responds to the deviceready event.",
-  "scripts": {},
+  "scripts": {
+    "build": "cd web && npm run build && cd .. && cordova build"
+  },
   "keywords": [
     "ecosystem:cordova"
   ],
