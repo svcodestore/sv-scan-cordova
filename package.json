@@ -1,6 +1,6 @@
 {
   "name": "com.starvincci.scan",
-  "displayName": "SV Prod Scan",
+  "displayName": "生产扫码",
   "version": "0.0.1",
   "description": "A sample Apache Cordova application that responds to the deviceready event.",
   "scripts": {
