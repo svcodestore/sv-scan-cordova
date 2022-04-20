@@ -3,5 +3,6 @@ module.exports = defineConfig({
   transpileDependencies: true,
   outputDir: '../www',
   publicPath: './',
-  productionSourceMap: false
+  productionSourceMap: false,
+  lintOnSave: false
 })
