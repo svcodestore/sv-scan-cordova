@@ -2,10 +2,12 @@
   <div>
     <van-button @click="handleClick">返回</van-button>
     <van-button type="primary" @click="handleScan">扫码</van-button>
+    <van-button type="info" @click="handleAjax">Ajax</van-button>
   </div>
 </template>
 
 <script>
+import { test } from '@/apis/scan'
 import { Button, Toast } from 'vant'
 import Vue from 'vue'
 import VueCordova from 'vue-cordova'
@@ -26,7 +28,7 @@ export default {
         showTorchButton: true, // iOS and Android
         torchOn: false, // Android, launch with the torch switched on (if available)
         saveHistory: false, // Android, save scan history (default false)
-        prompt: '请将内容放置扫描区域内', // Android
+        prompt: '请将内容放置在扫描区域内', // Android
         resultDisplayDuration: 0, // Android, display scanned text for X ms. 0 suppresses it entirely, default 1500
         formats: 'QR_CODE,PDF_417' // default: all but PDF_417 and RSS_EXPANDED
       }
@@ -45,13 +47,16 @@ export default {
         },
         scanOption
       )
+    },
+    handleAjax () {
+      test().then(res => {
+        Toast({
+          message: '数据：' + JSON.stringify(res),
+          position: 'bottom',
+          duration: 5000
+        })
+      })
     }
-  },
-  mounted () {
-    console.dir('deviceready...')
-    Vue.cordova.on('deviceready', () => {
-      console.log('Cordova : device is ready !')
-    })
   }
 }
 </script>
