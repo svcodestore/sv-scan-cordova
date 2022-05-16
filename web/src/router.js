@@ -21,6 +21,13 @@ const routes = [
     meta: {
       title: '录入'
     }
+  },
+  {
+    path: '/login',
+    component: () => import('./views/login'),
+    meta: {
+      title: '登录'
+    }
   }
 ]
 

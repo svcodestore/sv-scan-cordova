@@ -1,22 +1,43 @@
 <template>
   <div>
-    <van-grid>
-      <van-grid-item icon="user-o" text="登录" @click="$router.push('/scan')" />
-      <van-grid-item icon="qr" text="扫码" @click="$router.push('/scan')" />
-    </van-grid>
-    <van-tag
-      size="medium"
-      type="warning"
+    <div style="width: 100vw; height: 90vh;">
+      <van-grid>
+        <van-grid-item
+          icon="user-o"
+          text="登录"
+          @click="$router.push('/login')"
+        />
+        <van-grid-item
+          icon="qr"
+          text="扫码"
+          @click="$router.push(isLogined ? '/scan' : '/login')"
+        />
+      </van-grid>
+    </div>
+    <div
+      v-if="!isLogined"
       style="width: 100vw;
             height: 10vh;
             display: flex;
             justify-content: center;
-            align-items: center;
-            "
+            align-items: center;"
     >
-      <span>未登录，无法连接到数据库</span>
-      <span>未登录，未绑定工号</span>
-    </van-tag>
+      <van-tag size="medium" type="warning">
+        <span v-if="isConnected">未绑定工号</span>
+        <span v-else>未登录</span>
+      </van-tag>
+    </div>
+    <div
+      style="text-align: center;
+              margin: auto;
+              color: gray;
+              font-size: small;
+              letter-spacing: 2px;
+              "
+      v-if="username"
+    >
+      {{ username }}
+    </div>
   </div>
 </template>
 
@@ -31,12 +52,15 @@ export default {
     [GridItem.name]: GridItem
   },
   data () {
-    return {}
-  },
-  computed: {
-    isConnected () {
-      return ''
+    return {
+      isConnected: false,
+      isLogined: false,
+      username: ''
     }
+  },
+  mounted () {
+    this.isLogined = localStorage.getItem('isLogined') === 'true'
+    this.username = localStorage.getItem('username')
   }
 }
 </script>
