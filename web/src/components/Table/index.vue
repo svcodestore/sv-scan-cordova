@@ -61,16 +61,15 @@ export default {
     onCheckboxChange (row) {
       const checkedIndex = this.data.findIndex(e => e.item == row.item)
       if (!row.presetChecked) {
-        if (row.checked) {
+        if (!row.checked) {
           this.checkedRows = this.checkedRows.filter(
             e => e.item != row.item && e.descn != row.descn
           )
         } else {
-          this.checkedRows.push(this.data.data[checkedIndex])
+          this.checkedRows.push(this.data[checkedIndex])
         }
         this.lastCheckedRow = row
       }
-
       this.$emit('CheckboxChange', { row, checkedIndex })
     },
     getCheckedRow () {

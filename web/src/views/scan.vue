@@ -44,11 +44,16 @@
 
       <div class="tbls">
         <c-table
+          :isShowHeader="false"
           ref="scanedTbl"
           :data="scanedData"
           :columns="scanColumns"
         ></c-table>
-        <ctable ref="scanTbl" :data="scanData" :columns="scanColumns"></ctable>
+        <c-table
+          ref="scanTbl"
+          :data="scanData"
+          :columns="scanColumns"
+        ></c-table>
       </div>
     </div>
 
@@ -97,21 +102,21 @@
       </div>
     </van-action-sheet>
     <van-popup
-      :show="isShowSubPhs"
+      v-model="isShowSubPhs"
       round
       position="bottom"
       style="height: 90%"
-      @close="onCloseSubPhs"
+      @close="isShowSubPhs = false"
     >
       <div class="phase-container">
         <div class="phases">
-          <ctable
-            id="phsTbl"
+          <c-table
+            ref="phsTbl"
             @CheckboxChange="onTableCheckboxChange"
             :data="phaseData"
             :columns="phaseColumns"
           >
-          </ctable>
+          </c-table>
         </div>
         <div class="phase-toolbar">
           <van-button
@@ -182,16 +187,7 @@ export default {
       multiPhs: '',
       phsQty: '',
       bedno: '',
-      scanedData: [
-        {
-          prdno: '1',
-          facno: '1',
-          bedno: '2',
-          bundleNo: '1',
-          phsName: '1',
-          qty: '1'
-        }
-      ],
+      scanedData: [],
       scanData: [],
       scanColumns: [
         {
@@ -246,6 +242,53 @@ export default {
     }
   },
   methods: {
+    handleAddPhase () {
+      const rows = this.$refs.phsTbl.checkedRows
+
+      const data = []
+      rows.forEach(row => {
+        if (row.checked && !row.presetChecked) {
+          this.scanData.push({
+            prdno: this.phs,
+            facno: this.phs,
+            bedno: this.bedno,
+            bundleNo: this.bundleNo,
+            phsName: [row.descn, row.item].join(' - '),
+            qty: row.qty - this.missingQty - this.badQty,
+            item: row.item
+          })
+          data.push({
+            prdno: this.phs,
+            facno: this.phs,
+            bedno: this.bedno,
+            seq: this.bundleNo,
+            item: row.item,
+            descn: row.descn,
+            qty: row.qty
+          })
+        }
+      })
+      if (rows.length) {
+        if (data.length) {
+          this.savePhaseRemote(data).then(res => {
+            if (res.every(e => !!e)) {
+              Toast({
+                message: '已录入',
+                duration: 500
+              })
+            }
+          })
+        }
+        this.$refs.phsTbl.checkedRows = []
+        const multiPhs = rows
+          .map(row => row.descn + ' - ' + row.item)
+          .join(', ')
+        this.isShowSubPhs = false
+        this.multiPhs = this.multiPhs
+          ? this.multiPhs + ', ' + multiPhs
+          : multiPhs
+      }
+    },
     savePhaseRemote (data) {
       const promises = data.map(
         ({ prdno, facno, bedno, seq, item, descn, qty }) =>
@@ -333,69 +376,123 @@ export default {
     },
     handleScan () {
       this.scanBtnLoading = true
+      const text = '202150001-A5@Y50001-A5@1@66@60'
+      const codeInfo = text.split('@')
+      this.phs = codeInfo[0]
+      this.bedno = codeInfo[2]
+      this.bundleNo = codeInfo[3]
+      this.phsQty = codeInfo[4]
 
-      //扫描二维码
-      window.cordova.plugins.barcodeScanner.scan(
-        ({ text }) => {
-          const codeInfo = text.split('@')
+      const hostname = localStorage.getItem('database')
+      const username = localStorage.getItem('dbUsr')
+      const password = localStorage.getItem('dbPwd')
+      const database = localStorage.getItem('dbname')
+      const name = localStorage.getItem('username')
 
-          this.phs = codeInfo[0]
-          this.bedno = codeInfo[2]
-          this.bundleNo = codeInfo[3]
-          this.phsQty = codeInfo[4]
-
-          const hostname = localStorage.getItem('database')
-          const username = localStorage.getItem('dbUsr')
-          const password = localStorage.getItem('dbPwd')
-          const database = localStorage.getItem('dbname')
-          const name = localStorage.getItem('username')
-
-          getPhases({
-            hostname,
-            username,
-            password,
-            database,
-            facno: this.phs,
-            name
+      getPhases({
+        hostname,
+        username,
+        password,
+        database,
+        facno: this.phs,
+        name
+      })
+        .then(({ data }) => {
+          const scanedIndex = []
+          this.scanData.forEach(item => {
+            data.forEach((e, i) => {
+              const [s, n] = item.phsName.split(' - ')
+              if (
+                item.item == e.item &&
+                item.qty == e.qty &&
+                item.facno == e.facno &&
+                e.descn == s &&
+                e.item == n
+              ) {
+                scanedIndex.push(i)
+              }
+            })
           })
-            .then(({ data }) => {
-              const scanedIndex = []
-              this.scanData.forEach(item => {
-                data.data.forEach((e, i) => {
-                  if (
-                    item.phsName.split(' - ')[0] == e.desc.trim() &&
-                    item.facno == e.facno
-                  ) {
-                    scanedIndex.push(i)
-                  }
-                })
-              })
-              this.phaseData = data.data.map((e, i) => {
-                e.descn = e.descn.trim()
-                if (scanedIndex.includes(i)) {
-                  e.checked = true
-                  e.presetChecked = true
-                } else {
-                  e.checked = false
-                }
-                return e
-              })
-              this.isShowSubPhs = true
-              Toast({
-                message: '已录入',
-                duration: 500
-              })
-            })
-            .finally(() => {
-              this.scanBtnLoading = false
-            })
-        },
-        error => {
+
+          this.phaseData = data.map((e, i) => {
+            if (scanedIndex.includes(i)) {
+              e.checked = true
+              e.presetChecked = true
+            } else {
+              e.checked = false
+            }
+            return e
+          })
+          this.isShowSubPhs = true
+        })
+        .finally(() => {
           this.scanBtnLoading = false
-          console.err(error)
-        },
-        scanOption
-      )
+        })
+      this.scanBtnLoading = false
+      //扫描二维码
+      // window.cordova.plugins.barcodeScanner.scan(
+      //   ({ text }) => {
+      //     // 202150001-A5@Y50001-A5@1@66@60
+      //     const codeInfo = text.split('@')
+      //     console.log(codeInfo, 'codeInfo')
+      //     this.phs = codeInfo[0]
+      //     this.bedno = codeInfo[2]
+      //     this.bundleNo = codeInfo[3]
+      //     this.phsQty = codeInfo[4]
+
+      //     const hostname = localStorage.getItem('database')
+      //     const username = localStorage.getItem('dbUsr')
+      //     const password = localStorage.getItem('dbPwd')
+      //     const database = localStorage.getItem('dbname')
+      //     const name = localStorage.getItem('username')
+
+      //     getPhases({
+      //       hostname,
+      //       username,
+      //       password,
+      //       database,
+      //       facno: this.phs,
+      //       name
+      //     })
+      //       .then(({ data }) => {
+      //         console.log(data, 'getPhases')
+      //         const scanedIndex = []
+      //         this.scanData.forEach(item => {
+      //           data.data.forEach((e, i) => {
+      //             if (
+      //               item.phsName.split(' - ')[0] == e.desc.trim() &&
+      //               item.facno == e.facno
+      //             ) {
+      //               scanedIndex.push(i)
+      //             }
+      //           })
+      //         })
+      //         this.phaseData = data.data.map((e, i) => {
+      //           e.descn = e.descn.trim()
+      //           if (scanedIndex.includes(i)) {
+      //             e.checked = true
+      //             e.presetChecked = true
+      //           } else {
+      //             e.checked = false
+      //           }
+      //           return e
+      //         })
+      //         this.isShowSubPhs = true
+      //         Toast({
+      //           message: '已录入',
+      //           duration: 500
+      //         })
+      //       })
+      //       .finally(() => {
+      //         this.scanBtnLoading = false
+      //       })
+      //   },
+      //   error => {
+      //     this.scanBtnLoading = false
+      //     console.err(error)
+      //   },
+      //   scanOption
+      // )
     },
     handleAjax () {}
   }
