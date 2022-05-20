@@ -30,13 +30,13 @@
             :loading="scanMultiBtnLoading"
             size="small"
             type="primary"
-            bindtap="handleScanMulti"
+            @click="handleScanMulti"
           >
             连续扫码
           </van-button>
         </van-field>
         <van-field v-model="multiPhs" label="工序" readonly :border="false">
-          <van-button slot="button" size="small" bindtap="getScanRecord">
+          <van-button slot="button" size="small" @click="getScanRecord">
             扫码记录
           </van-button>
         </van-field>
@@ -131,7 +131,7 @@
             type="default"
             size="large"
             style="width: 50%; height: 100%;"
-            @click="handleCancelAdd"
+            @click="isShowSubPhs = false"
             >取消
           </van-button>
         </div>
@@ -155,7 +155,7 @@ import Vue from 'vue'
 import VueCordova from 'vue-cordova'
 Vue.use(VueCordova)
 
-import { getPhases, saveScanData } from '@/apis/scan'
+import { getPhases, saveScanData, getScanRecord } from '@/apis/scan'
 import Table from '@/components/Table'
 
 const scanOption = {
@@ -242,21 +242,41 @@ export default {
     }
   },
   methods: {
-    handleAddPhase () {
+    getScanRecord () {
+      const hostname = localStorage.getItem('database')
+      const username = localStorage.getItem('dbUsr')
+      const password = localStorage.getItem('dbPwd')
+      const database = localStorage.getItem('dbname')
+      const name = localStorage.getItem('username')
+      const workno = localStorage.getItem('staffno')
+      getScanRecord({
+        hostname,
+        username,
+        password,
+        database,
+        workno,
+        name
+      }).then(({ data }) => {
+        const scaned = data.map(e => {
+          const o = {}
+          o.prdno = e.prdno
+          o.facno = e.facno
+          o.bedno = e.bedno
+          o.bundleNo = e.seq
+          o.phsName = e.descn + ' - ' + e.item
+          o.qty = e.qty
+          return o
+        })
+        this.scanedData = scaned
+      })
+    },
+    async handleAddPhase () {
+      let isScaned = true
       const rows = this.$refs.phsTbl.checkedRows
 
       const data = []
       rows.forEach(row => {
         if (row.checked && !row.presetChecked) {
-          this.scanData.push({
-            prdno: this.phs,
-            facno: this.phs,
-            bedno: this.bedno,
-            bundleNo: this.bundleNo,
-            phsName: [row.descn, row.item].join(' - '),
-            qty: row.qty - this.missingQty - this.badQty,
-            item: row.item
-          })
           data.push({
             prdno: this.phs,
             facno: this.phs,
@@ -270,11 +290,26 @@ export default {
       })
       if (rows.length) {
         if (data.length) {
-          this.savePhaseRemote(data).then(res => {
+          await this.savePhaseRemote(data).then(res => {
             if (res.every(e => !!e)) {
               Toast({
                 message: '已录入',
                 duration: 500
+              })
+              isScaned = false
+
+              rows.forEach(row => {
+                if (row.checked && !row.presetChecked) {
+                  this.scanData.push({
+                    prdno: this.phs,
+                    facno: this.phs,
+                    bedno: this.bedno,
+                    bundleNo: this.bundleNo,
+                    phsName: [row.descn, row.item].join(' - '),
+                    qty: row.qty - this.missingQty - this.badQty,
+                    item: row.item
+                  })
+                }
               })
             }
           })
@@ -288,6 +323,8 @@ export default {
           ? this.multiPhs + ', ' + multiPhs
           : multiPhs
       }
+
+      return isScaned
     },
     savePhaseRemote (data) {
       const promises = data.map(
@@ -376,123 +413,69 @@ export default {
     },
     handleScan () {
       this.scanBtnLoading = true
-      const text = '202150001-A5@Y50001-A5@1@66@60'
-      const codeInfo = text.split('@')
-      this.phs = codeInfo[0]
-      this.bedno = codeInfo[2]
-      this.bundleNo = codeInfo[3]
-      this.phsQty = codeInfo[4]
 
-      const hostname = localStorage.getItem('database')
-      const username = localStorage.getItem('dbUsr')
-      const password = localStorage.getItem('dbPwd')
-      const database = localStorage.getItem('dbname')
-      const name = localStorage.getItem('username')
+      // 扫描二维码
+      window.cordova.plugins.barcodeScanner.scan(
+        ({ text }) => {
+          // 202150001-A5@Y50001-A5@1@66@60
+          const codeInfo = text.split('@')
+          this.phs = codeInfo[0]
+          this.bedno = codeInfo[2]
+          this.bundleNo = codeInfo[3]
+          this.phsQty = codeInfo[4]
 
-      getPhases({
-        hostname,
-        username,
-        password,
-        database,
-        facno: this.phs,
-        name
-      })
-        .then(({ data }) => {
-          const scanedIndex = []
-          this.scanData.forEach(item => {
-            data.forEach((e, i) => {
-              const [s, n] = item.phsName.split(' - ')
-              if (
-                item.item == e.item &&
-                item.qty == e.qty &&
-                item.facno == e.facno &&
-                e.descn == s &&
-                e.item == n
-              ) {
-                scanedIndex.push(i)
-              }
+          const hostname = localStorage.getItem('database')
+          const username = localStorage.getItem('dbUsr')
+          const password = localStorage.getItem('dbPwd')
+          const database = localStorage.getItem('dbname')
+          const name = localStorage.getItem('username')
+
+          getPhases({
+            hostname,
+            username,
+            password,
+            database,
+            facno: this.phs,
+            name
+          })
+            .then(({ data }) => {
+              const scanedIndex = []
+              this.scanData.forEach(item => {
+                data.forEach((e, i) => {
+                  const [s, n] = item.phsName.split(' - ')
+                  if (
+                    item.item == e.item &&
+                    item.qty == e.qty &&
+                    item.facno == e.facno &&
+                    e.descn == s &&
+                    e.item == n
+                  ) {
+                    scanedIndex.push(i)
+                  }
+                })
+              })
+
+              this.phaseData = data.map((e, i) => {
+                if (scanedIndex.includes(i)) {
+                  e.checked = true
+                  e.presetChecked = true
+                } else {
+                  e.checked = false
+                }
+                return e
+              })
+              this.isShowSubPhs = true
             })
-          })
-
-          this.phaseData = data.map((e, i) => {
-            if (scanedIndex.includes(i)) {
-              e.checked = true
-              e.presetChecked = true
-            } else {
-              e.checked = false
-            }
-            return e
-          })
-          this.isShowSubPhs = true
-        })
-        .finally(() => {
+            .finally(() => {
+              this.scanBtnLoading = false
+            })
+        },
+        error => {
           this.scanBtnLoading = false
-        })
-      this.scanBtnLoading = false
-      //扫描二维码
-      // window.cordova.plugins.barcodeScanner.scan(
-      //   ({ text }) => {
-      //     // 202150001-A5@Y50001-A5@1@66@60
-      //     const codeInfo = text.split('@')
-      //     console.log(codeInfo, 'codeInfo')
-      //     this.phs = codeInfo[0]
-      //     this.bedno = codeInfo[2]
-      //     this.bundleNo = codeInfo[3]
-      //     this.phsQty = codeInfo[4]
-
-      //     const hostname = localStorage.getItem('database')
-      //     const username = localStorage.getItem('dbUsr')
-      //     const password = localStorage.getItem('dbPwd')
-      //     const database = localStorage.getItem('dbname')
-      //     const name = localStorage.getItem('username')
-
-      //     getPhases({
-      //       hostname,
-      //       username,
-      //       password,
-      //       database,
-      //       facno: this.phs,
-      //       name
-      //     })
-      //       .then(({ data }) => {
-      //         console.log(data, 'getPhases')
-      //         const scanedIndex = []
-      //         this.scanData.forEach(item => {
-      //           data.data.forEach((e, i) => {
-      //             if (
-      //               item.phsName.split(' - ')[0] == e.desc.trim() &&
-      //               item.facno == e.facno
-      //             ) {
-      //               scanedIndex.push(i)
-      //             }
-      //           })
-      //         })
-      //         this.phaseData = data.data.map((e, i) => {
-      //           e.descn = e.descn.trim()
-      //           if (scanedIndex.includes(i)) {
-      //             e.checked = true
-      //             e.presetChecked = true
-      //           } else {
-      //             e.checked = false
-      //           }
-      //           return e
-      //         })
-      //         this.isShowSubPhs = true
-      //         Toast({
-      //           message: '已录入',
-      //           duration: 500
-      //         })
-      //       })
-      //       .finally(() => {
-      //         this.scanBtnLoading = false
-      //       })
-      //   },
-      //   error => {
-      //     this.scanBtnLoading = false
-      //     console.err(error)
-      //   },
-      //   scanOption
-      // )
+          console.err(error)
+        },
+        scanOption
+      )
     },
     handleAjax () {}
   }
